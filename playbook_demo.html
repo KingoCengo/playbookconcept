@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Adaptive Playbook Engine — Concept Demo</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#F2F4F6; --panel:#FFFFFF; --line:#D9DFE4; --ink:#171F29; --ink-soft:#5B6773;
+    --teal:#20726A; --teal-soft:#E3F1EF; --amber:#B9791F; --amber-soft:#FBF0DD;
+    --red:#B23A2E; --red-soft:#FBE7E4; --chip:#EEF1F3; --radius:7px;
+  }
+  :root:not([data-theme="light"]){
+    @media (prefers-color-scheme: dark){
+      --bg:#12161C; --panel:#181E26; --line:#2A323C; --ink:#E7ECF0; --ink-soft:#93A0AC;
+      --teal:#4FBDAE; --teal-soft:#173330; --amber:#E0A94A; --amber-soft:#332510;
+      --red:#E17264; --red-soft:#341F1C; --chip:#1F2731;
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#12161C; --panel:#181E26; --line:#2A323C; --ink:#E7ECF0; --ink-soft:#93A0AC;
+    --teal:#4FBDAE; --teal-soft:#173330; --amber:#E0A94A; --amber-soft:#332510;
+    --red:#E17264; --red-soft:#341F1C; --chip:#1F2731;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:'Sora',system-ui,-apple-system,Segoe UI,sans-serif; -webkit-font-smoothing:antialiased;}
+  .num{font-family:'IBM Plex Mono',monospace;}
+  .wrap{max-width:1040px;margin:0 auto;padding:28px 20px 64px;}
+  header.top{margin-bottom:22px;}
+  header.top h1{font-size:22px;font-weight:700;margin:0 0 6px;letter-spacing:-0.01em;}
+  header.top p{font-size:14px;color:var(--ink-soft);margin:0;max-width:68ch;line-height:1.55;}
+
+  .productbar{display:flex;align-items:center;gap:10px;margin:22px 0 18px;flex-wrap:wrap;}
+  .productbar .label{font-size:12px;color:var(--ink-soft);margin-right:2px;}
+  .pbtn{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:7px 14px; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:13px; font-weight:600; cursor:pointer;}
+  .pbtn[data-active="true"]{border-color:var(--teal); background:var(--teal-soft); color:var(--teal);}
+
+  .tabs{display:flex; gap:2px; border-bottom:1px solid var(--line); margin-bottom:20px;}
+  .tabbtn{background:none;border:none;padding:10px 16px;font-family:'Sora',sans-serif;font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; border-bottom:2px solid transparent; margin-bottom:-1px;}
+  .tabbtn[data-active="true"]{color:var(--ink); border-bottom-color:var(--teal);}
+
+  .panel{background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:20px;}
+  .panel + .panel{margin-top:16px;}
+  .panel h2{font-size:14px; margin:0 0 4px; font-weight:600;}
+  .panel .sub{font-size:12.5px; color:var(--ink-soft); margin:0 0 16px; line-height:1.5;}
+
+  .path{display:flex; flex-wrap:wrap; gap:8px; min-height:34px; margin-bottom:4px;}
+  .chip{display:flex; align-items:center; gap:7px; padding:6px 11px; border-radius:20px; font-size:12.5px; font-weight:500; border:1px solid var(--line); background:var(--chip);}
+  .chip .dot{width:7px;height:7px;border-radius:50%;flex:none;}
+  .dot.success{background:var(--teal);} .dot.fail{background:var(--red);}
+  .dot.open{background:var(--amber); animation:pulse 1.6s infinite;}
+  @media (prefers-reduced-motion: reduce){ .dot.open{animation:none;} }
+  @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.35;}}
+
+  .current-box{margin-top:16px; padding:14px 16px; border:1px dashed var(--line); border-radius:var(--radius);}
+  .current-box .row1{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap;}
+  .current-box .name{font-size:14px; font-weight:600;}
+  .current-box .name .tag{font-size:10.5px; font-weight:600; color:var(--ink-soft); margin-left:8px;}
+  .current-box .cdesc{font-size:12px; color:var(--ink-soft); margin-top:4px; max-width:52ch; line-height:1.5;}
+  .current-box .cowner{font-size:11.5px; color:var(--ink-soft); margin-top:6px;}
+  .current-box .cowner b{color:var(--ink);}
+  .close-actions{display:flex; gap:8px; flex:none;}
+  .closebtn{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:7px 12px; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:12.5px; font-weight:600; cursor:pointer;}
+  .closebtn.ok{border-color:var(--teal); color:var(--teal);} .closebtn.bad{border-color:var(--red); color:var(--red);}
+  .finalrow{display:flex; align-items:center; gap:7px; margin-top:12px; padding-top:12px; border-top:1px solid var(--line);}
+  .finalrow label{font-size:12px; color:var(--ink-soft); cursor:pointer;}
+  .finalrow input[type=checkbox]{width:14px; height:14px; cursor:pointer;}
+
+  .suggestlist{display:flex; flex-direction:column; gap:8px; margin-top:14px;}
+  .suggest{display:flex; align-items:flex-start; justify-content:space-between; gap:12px; border:1px solid var(--line); border-radius:var(--radius); padding:11px 13px; background:var(--panel); cursor:pointer; text-align:left; width:100%; font-family:'Sora',sans-serif;}
+  .suggest:hover{border-color:var(--teal);}
+  .suggest .left{display:flex; align-items:flex-start; gap:10px; min-width:0;}
+  .suggest .sbody{min-width:0;}
+  .suggest .sname{font-size:13.5px; font-weight:600; color:var(--ink);}
+  .suggest .sdesc{font-size:11.5px; color:var(--ink-soft); margin-top:2px; line-height:1.45; max-width:46ch;}
+  .suggest .sstat{font-size:11.5px; color:var(--ink-soft); margin-top:5px;}
+  .suggest .sstat b{color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+  .suggest .sowner{font-size:10.5px; color:var(--ink-soft); margin-top:4px;}
+  .badgerow{display:flex; flex-direction:column; gap:5px; flex:none; align-items:flex-start;}
+  .badge{font-size:10px; font-weight:600; padding:2px 7px; border-radius:20px; flex:none;}
+  .badge.core{background:var(--teal-soft); color:var(--teal);}
+  .badge.flex{background:var(--amber-soft); color:var(--amber);}
+  .badge.owner{background:var(--chip); color:var(--ink-soft); font-weight:600;}
+  .suggest .right{display:flex; align-items:center; gap:6px; flex:none;}
+  .metric{font-size:11px; color:var(--ink-soft); text-align:right;}
+  .metric b{display:block; font-size:14px; color:var(--ink); font-family:'IBM Plex Mono',monospace;}
+  .metric b.warn{color:var(--red);}
+
+  .customrow{display:flex; gap:8px; margin-top:14px;}
+  .customrow input{flex:1; border:1px solid var(--line); background:var(--bg); color:var(--ink); padding:9px 12px; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:13px;}
+  .customrow button{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:0 16px; border-radius:var(--radius); font-weight:600; font-size:13px; cursor:pointer;}
+
+  .autocomplete{display:none; flex-direction:column; gap:4px; margin-top:6px;}
+  .acitem{text-align:left; border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:6px 10px; border-radius:var(--radius); font-size:12.5px; cursor:pointer; font-family:'Sora',sans-serif;}
+  .acitem:hover{border-color:var(--teal);}
+
+  .dymbox{border:1px solid var(--amber); background:var(--amber-soft); border-radius:var(--radius); padding:9px 12px; font-size:12.5px; display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:6px;}
+  .dymbox button{border:1px solid var(--line); background:var(--panel); color:var(--ink); padding:5px 10px; border-radius:var(--radius); font-size:12px; cursor:pointer; font-weight:600; font-family:'Sora',sans-serif;}
+
+  .descwrap{margin-top:8px; display:flex; gap:10px; align-items:flex-start;}
+  .descwrap textarea{flex:1; min-height:52px; border:1px solid var(--line); background:var(--bg); color:var(--ink); padding:8px 10px; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:12.5px; resize:vertical;}
+  .ownerwrap{width:190px; flex:none;}
+  .ownerwrap label{display:block; font-size:10.5px; color:var(--ink-soft); margin-bottom:4px;}
+  .ownerwrap select{width:100%; border:1px solid var(--line); background:var(--bg); color:var(--ink); padding:8px 8px; border-radius:var(--radius); font-family:'Sora',sans-serif; font-size:12.5px;}
+  .desccount{font-size:10.5px; color:var(--ink-soft); text-align:right; margin-top:3px;}
+
+  .hint{font-size:11.5px; color:var(--ink-soft); margin-top:8px; line-height:1.5;}
+  .resetlink{background:none;border:none;color:var(--ink-soft); font-size:12px; cursor:pointer; text-decoration:underline; padding:0;}
+  .toprow{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;}
+
+  table{width:100%; border-collapse:collapse; font-size:12.5px;}
+  th{text-align:left; font-size:11px; color:var(--ink-soft); font-weight:600; padding:6px 8px; border-bottom:1px solid var(--line);}
+  td{padding:8px 8px; border-bottom:1px solid var(--line); vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .stepcell .sname{font-weight:600; font-size:12.5px;}
+  .stepcell .sdesc{font-size:11px; color:var(--ink-soft); margin-top:2px; max-width:34ch; line-height:1.4;}
+  .pill{display:inline-block; padding:2px 8px; border-radius:20px; font-size:11px; font-weight:600; font-family:'IBM Plex Mono',monospace;}
+  .pill.good{background:var(--teal-soft); color:var(--teal);}
+  .pill.mid{background:var(--amber-soft); color:var(--amber);}
+  .pill.bad{background:var(--red-soft); color:var(--red);}
+  .ownertag{display:inline-block; padding:2px 8px; border-radius:20px; font-size:10.5px; font-weight:600; background:var(--chip); color:var(--ink-soft);}
+
+  .warncard{border:1px solid var(--red); background:var(--red-soft); border-radius:var(--radius); padding:11px 14px; font-size:12.5px; line-height:1.5; margin-bottom:8px;}
+  .warncard b{color:var(--red);}
+  .warncard:last-child{margin-bottom:0;}
+  .nowarn{font-size:12.5px; color:var(--ink-soft);}
+
+  .candcard{border:1px solid var(--amber); background:var(--amber-soft); border-radius:var(--radius); padding:14px 16px; margin-bottom:10px;}
+  .candcard:last-child{margin-bottom:0;}
+  .candcard .ctop{display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;}
+  .candcard .cname{font-size:13.5px; font-weight:700; color:var(--ink);}
+  .candcard .cmeta{font-size:11.5px; color:var(--ink-soft); margin-top:3px; line-height:1.5;}
+  .candactions{display:flex; gap:8px; flex:none;}
+  .candbtn{border:1px solid var(--line); background:var(--panel); padding:6px 12px; border-radius:var(--radius); font-size:12px; font-weight:600; cursor:pointer; font-family:'Sora',sans-serif;}
+  .candbtn.promote{border-color:var(--teal); color:var(--teal);}
+  .candbtn.dismiss{color:var(--ink-soft);}
+
+  .recrow{border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; margin-bottom:8px; font-size:12.5px;}
+  .recrow:last-child{margin-bottom:0;}
+  .recrow .rchain{font-weight:600; line-height:1.5;}
+  .recrow .rmeta{color:var(--ink-soft); font-size:11px; margin-top:4px;}
+
+  .charts{display:grid; grid-template-columns:1fr 1fr; gap:16px;}
+  @media (max-width:720px){ .charts{grid-template-columns:1fr;} }
+  .chartbox{height:230px;}
+  .overflow{overflow-x:auto;}
+  .foot{margin-top:26px; font-size:11.5px; color:var(--ink-soft); text-align:center;}
+
+  .heatgrid{display:grid; grid-template-columns: 2.2fr 1fr 1fr 1fr; gap:8px;}
+  .heatcell{border-radius:8px; padding:10px 8px; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-weight:700; font-family:'IBM Plex Mono',monospace; min-height:40px; text-align:center;}
+  .heatlabel{display:flex; align-items:center; font-size:12px; font-weight:600; padding:8px 4px;}
+  .heathead{font-size:11px; font-weight:700; color:var(--ink-soft); text-align:center; padding:4px; text-transform:uppercase; letter-spacing:0.5px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <h1>Adaptive Playbook Engine</h1>
+    <p>Instead of a fixed task template, the next step is recommended from historical CTA data. No step is mandatory — backbone steps just carry a stronger recommendation, and consistently-used patterns can be formally promoted into the backbone. All data below is synthetic (mock), built to illustrate the concept.</p>
+  </header>
+
+  <div class="productbar">
+    <span class="label">Product</span>
+    <button class="pbtn" data-product="A">Product A</button>
+    <button class="pbtn" data-product="B">Product B</button>
+    <button class="pbtn" data-product="C">Product C</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tabbtn" data-tab="sim">Simulation</button>
+    <button class="tabbtn" data-tab="dash">Dashboard</button>
+  </div>
+
+  <div id="tab-sim">
+    <div class="panel">
+      <div class="toprow">
+        <div>
+          <h2>Process Walkthrough</h2>
+          <p class="sub">Recommendations are always visible below. Picking one — or adding your own — closes the current step as successful unless you close it yourself first.</p>
+        </div>
+        <button class="resetlink" id="resetBtn">Reset process</button>
+      </div>
+      <div class="path" id="pathRow"></div>
+      <div id="currentArea"></div>
+      <div id="suggestArea"></div>
+
+      <div class="customrow">
+        <input type="text" id="customInput" placeholder="Add a step that isn't listed…">
+        <button id="customBtn" type="button">Add</button>
+      </div>
+      <div class="autocomplete" id="customAutocomplete"></div>
+      <div id="didYouMean" style="display:none;"></div>
+      <div class="descwrap">
+        <textarea id="customDesc" maxlength="250" placeholder="Optional: describe this step (max 250 characters)"></textarea>
+        <div class="ownerwrap">
+          <label for="customOwner">Owner</label>
+          <select id="customOwner"></select>
+        </div>
+      </div>
+      <div class="desccount"><span id="descCount">0</span>/250</div>
+
+      <p class="hint" id="hintText"></p>
+    </div>
+  </div>
+
+  <div id="tab-dash" style="display:none;">
+    <div class="panel">
+      <h2>Step Usage, Health &amp; Ownership</h2>
+      <p class="sub">Calculated from every logged CTA for this product, mock and real alike. Backbone steps (including promoted ones) are always recommended but never enforced — that's why usage sits below 100%.</p>
+      <div class="overflow">
+        <table>
+          <thead><tr><th>Step</th><th>Type</th><th>Owner</th><th>Usage</th><th>Success Rate</th><th>Avg. Open Time</th><th>CTAs</th></tr></thead>
+          <tbody id="healthBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Ownership Load</h2>
+      <p class="sub">Who is actually holding the work, not just which step it's on — sorted by where things are stalling most.</p>
+      <div class="overflow">
+        <table>
+          <thead><tr><th>Owner</th><th>Steps handled</th><th>Success Rate</th><th>Avg. Open Time</th></tr></thead>
+          <tbody id="ownerBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Bottlenecks</h2>
+      <p class="sub">Steps that are commonly used but close unsuccessfully more often than average — where the process tends to stall, and who is holding it when it does.</p>
+      <div id="bottleneckArea"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Standardization Candidates</h2>
+      <p class="sub">Optional steps used consistently enough that they're arguably no longer optional. The system proposes; a person still approves the promotion into the backbone.</p>
+      <div id="candidateArea"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Usage &amp; Success Charts</h2>
+      <div class="charts">
+        <div class="chartbox"><canvas id="usageChart"></canvas></div>
+        <div class="chartbox"><canvas id="successChart"></canvas></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Cross-Product Usage Heatmap</h2>
+      <p class="sub">The same step list across all three products — this is what makes each product's emergent pattern visible at a glance.</p>
+      <div id="heatmapArea"></div>
+    </div>
+
+    <div class="panel">
+      <h2>Most Common Transitions</h2>
+      <p class="sub">What CSMs move to most often after each step — this is the data the recommendation engine runs on.</p>
+      <div class="overflow">
+        <table>
+          <thead><tr><th>From step</th><th>To step</th><th>Share</th></tr></thead>
+          <tbody id="transBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>Recorded CTAs</h2>
+      <p class="sub">Journeys logged from the Simulation tab are folded back into the stats above — the engine updates itself as real CTAs are recorded. Each product keeps its own log.</p>
+      <div id="recordedArea"></div>
+    </div>
+  </div>
+
+  <p class="foot">Concept demo · Not connected to Gainsight · All data is illustrative</p>
+</div>
+
+<script>
+(function(){
+
+const BACKBONE = [
+  "Align with Internal Stakeholders",
+  "Position the Value to Decision Makers",
+  "Ensure Technical & Functional Prerequisites",
+  "Onboard Users",
+  "Drive Product Usage & Performance",
+  "Collect Product Feedback",
+  "Prove Product Value",
+  "Engage Pricing & Contracting Discussions",
+  "Move to BAU"
+];
+
+const STEP_DESC = {
+  "Align with Internal Stakeholders": "Sync internally on account context, ownership and success criteria before engaging the customer.",
+  "Position the Value to Decision Makers": "Present the business case and expected outcomes to the people who sign off on the relationship.",
+  "Ensure Technical & Functional Prerequisites": "Confirm technical setup, access and functional requirements are in place before rollout.",
+  "Onboard Users": "Get end users set up, trained and comfortable with the core workflows.",
+  "Drive Product Usage & Performance": "Encourage adoption of key features and monitor usage against expected performance.",
+  "Collect Product Feedback": "Gather structured feedback from the customer on what's working and what isn't.",
+  "Prove Product Value": "Quantify and document the measurable value delivered so far.",
+  "Engage Pricing & Contracting Discussions": "Open conversations about renewal terms, pricing or contract scope.",
+  "Move to BAU": "Hand the account off to steady-state, business-as-usual management.",
+  "Executive Sponsor Call": "Loop in an executive sponsor early to reinforce strategic buy-in.",
+  "Legal & Compliance Review": "Route the agreement through legal and compliance sign-off.",
+  "Custom Integration Scoping": "Scope any non-standard integration work the customer needs.",
+  "Data Migration Planning": "Plan how the customer's existing data will be migrated into the platform.",
+  "Localization Requirements": "Capture language and regional formatting requirements.",
+  "Extended Pilot Period": "Run a longer pilot phase before committing to full rollout.",
+  "Security Assessment": "Complete the customer's security and risk review process.",
+  "Vendor & Partner Coordination": "Coordinate with third-party vendors or partners involved in delivery.",
+  "Renewal Risk Mitigation Plan": "Put a plan in place to address renewal risk signals."
+};
+
+const OWNERS = ["CSM", "Customer", "Legal", "Product & Engineering", "Finance", "Partner"];
+
+const STEP_OWNER = {
+  "Align with Internal Stakeholders": "CSM",
+  "Position the Value to Decision Makers": "Customer",
+  "Ensure Technical & Functional Prerequisites": "Product & Engineering",
+  "Onboard Users": "CSM",
+  "Drive Product Usage & Performance": "CSM",
+  "Collect Product Feedback": "Customer",
+  "Prove Product Value": "CSM",
+  "Engage Pricing & Contracting Discussions": "Finance",
+  "Move to BAU": "CSM",
+  "Executive Sponsor Call": "Customer",
+  "Legal & Compliance Review": "Legal",
+  "Custom Integration Scoping": "Product & Engineering",
+  "Data Migration Planning": "Product & Engineering",
+  "Localization Requirements": "Product & Engineering",
+  "Extended Pilot Period": "Customer",
+  "Security Assessment": "Legal",
+  "Vendor & Partner Coordination": "Partner",
+  "Renewal Risk Mitigation Plan": "CSM"
+};
+
+const PRODUCTS = {
+  A: { label:"Product A", optionals:[
+    {name:"Executive Sponsor Call", after:0, freq:0.25},
+    {name:"Legal & Compliance Review", after:2, freq:0.42},
+    {name:"Custom Integration Scoping", after:2, freq:0.30}
+  ]},
+  B: { label:"Product B", optionals:[
+    {name:"Data Migration Planning", after:2, freq:0.50},
+    {name:"Localization Requirements", after:3, freq:0.20},
+    {name:"Extended Pilot Period", after:4, freq:0.35}
+  ]},
+  C: { label:"Product C", optionals:[
+    {name:"Security Assessment", after:2, freq:0.45},
+    {name:"Vendor & Partner Coordination", after:1, freq:0.15},
+    {name:"Renewal Risk Mitigation Plan", after:6, freq:0.25}
+  ]}
+};
+
+const SUCCESS_RATE = {
+  "Ensure Technical & Functional Prerequisites": 0.62,
+  "Engage Pricing & Contracting Discussions": 0.68,
+  "Legal & Compliance Review": 0.55,
+  "Security Assessment": 0.58,
+  "Data Migration Planning": 0.72,
+  "Renewal Risk Mitigation Plan": 0.66
+};
+function successProbOf(name){ return SUCCESS_RATE[name] !== undefined ? SUCCESS_RATE[name] : 0.90; }
+
+// Per-product state that grows as the CSM uses the tool: promotions, dismissals, custom text.
+const CUSTOM_DESCS = { A:{}, B:{}, C:{} };
+const CUSTOM_OWNERS = { A:{}, B:{}, C:{} };
+const promotedBackbone = { A:new Set(), B:new Set(), C:new Set() };
+const dismissedCandidates = { A:new Set(), B:new Set(), C:new Set() };
+
+function isBackbone(name){ return BACKBONE.indexOf(name) !== -1 || promotedBackbone[currentProduct].has(name); }
+function isBackboneFor(name, product){ return BACKBONE.indexOf(name) !== -1 || promotedBackbone[product].has(name); }
+function descOf(name){
+  if (CUSTOM_DESCS[currentProduct] && CUSTOM_DESCS[currentProduct][name]) return CUSTOM_DESCS[currentProduct][name];
+  return STEP_DESC[name] || "Added manually by the CSM during this CTA.";
+}
+function ownerOf(name){
+  if (CUSTOM_OWNERS[currentProduct] && CUSTOM_OWNERS[currentProduct][name]) return CUSTOM_OWNERS[currentProduct][name];
+  return STEP_OWNER[name] || "CSM";
+}
+function daysFor(name){
+  const p = successProbOf(name);
+  return p<0.75 ? (8+Math.random()*25) : (1+Math.random()*10);
+}
+
+function buildJourney(productKey){
+  const prod = PRODUCTS[productKey];
+  const doneSet = new Set();
+  const seq = [];
+  const truncateAt = (Math.random() < 0.15) ? (3 + Math.floor(Math.random()*5)) : null;
+  const earlyPricing = Math.random() < 0.12;
+
+  for (let i=0;i<BACKBONE.length;i++){
+    if (truncateAt !== null && i > truncateAt) break;
+    if (!doneSet.has(i)){
+      const isMiddle = i>0 && i<BACKBONE.length-1;
+      const skip = isMiddle && Math.random() < 0.04;
+      const isOpenEnd = (truncateAt !== null && i === truncateAt);
+      if (!skip){
+        seq.push(makeInstance(BACKBONE[i], isOpenEnd));
+        doneSet.add(i);
+      }
+    }
+    if (i===1 && earlyPricing && !doneSet.has(8)){
+      seq.push(makeInstance(BACKBONE[8], false));
+      doneSet.add(8);
+    }
+    prod.optionals.filter(o=>o.after===i).forEach(o=>{
+      if (Math.random() < o.freq){
+        seq.push(makeInstance(o.name, false));
+      }
+    });
+  }
+  return seq;
+}
+
+function makeInstance(name, isOpenEnd){
+  if (isOpenEnd) return {name, status:'open', days: 1+Math.random()*6};
+  const p = successProbOf(name);
+  const status = Math.random() < p ? 'success' : 'fail';
+  return {name, status, days: daysFor(name)};
+}
+
+function buildDataset(productKey){
+  const journeys = [];
+  for (let j=0;j<100;j++) journeys.push(buildJourney(productKey));
+  return journeys;
+}
+
+function computeStats(journeys){
+  const total = journeys.length;
+  const usage = {}, health = {}, transitions = {}, starts = {};
+  journeys.forEach(seq=>{
+    const seen = new Set();
+    seq.forEach((inst, idx)=>{
+      if (!seen.has(inst.name)){ usage[inst.name] = (usage[inst.name]||0)+1; seen.add(inst.name); }
+      if (!health[inst.name]) health[inst.name] = {success:0, fail:0, open:0, days:0, n:0};
+      const h = health[inst.name];
+      h[inst.status]++; h.days += inst.days; h.n++;
+      const from = idx===0 ? 'START' : seq[idx-1].name;
+      if (idx===0){ starts[inst.name] = (starts[inst.name]||0)+1; }
+      if (!transitions[from]) transitions[from] = {};
+      transitions[from][inst.name] = (transitions[from][inst.name]||0)+1;
+    });
+  });
+  transitions['START'] = starts;
+  return {total, usage, health, transitions};
+}
+
+const DATA = {}, STATS = {};
+Object.keys(PRODUCTS).forEach(k=>{ DATA[k]=buildDataset(k); STATS[k]=computeStats(DATA[k]); });
+
+let currentProduct = 'A';
+let currentTab = 'sim';
+let path = [];
+let sessionCounts = { A:{}, B:{}, C:{} };
+let recordedJourneys = [];
+let journeyCounter = 0;
+
+function bumpSession(from, to){
+  const sc = sessionCounts[currentProduct];
+  if (!sc[from]) sc[from] = {};
+  sc[from][to] = (sc[from][to]||0)+1;
+}
+
+function getSuggestions(fromName){
+  const hist = (STATS[currentProduct].transitions[fromName]) || {};
+  const sess = (sessionCounts[currentProduct][fromName]) || {};
+  const combined = {};
+  Object.keys(hist).forEach(k=> combined[k]=(combined[k]||0)+hist[k]);
+  Object.keys(sess).forEach(k=> combined[k]=(combined[k]||0)+sess[k]*3);
+  const already = new Set(path.map(p=>p.name));
+  const entries = Object.entries(combined).filter(([name])=>!already.has(name));
+  const sum = entries.reduce((a,[,v])=>a+v,0) || 1;
+  return entries
+    .map(([name,count])=>({ name, pct: Math.round((count/sum)*100), core: isBackbone(name), owner: ownerOf(name), successRate: healthSuccessRate(name) }))
+    .sort((a,b)=>b.pct-a.pct)
+    .slice(0,6);
+}
+
+function healthSuccessRate(name){
+  const h = STATS[currentProduct].health[name];
+  if (!h) return null;
+  const closed = h.success + h.fail;
+  if (closed===0) return null;
+  return Math.round((h.success/closed)*100);
+}
+
+// ---------- known steps / autocomplete / did-you-mean ----------
+function knownStepsForProduct(product){
+  const set = new Set(BACKBONE);
+  PRODUCTS[product].optionals.forEach(o=>set.add(o.name));
+  recordedJourneys.filter(r=>r.product===product).forEach(r=> r.steps.forEach(s=>set.add(s.name)));
+  if (product===currentProduct){ path.forEach(p=>set.add(p.name)); }
+  return Array.from(set);
+}
+
+function levenshtein(a,b){
+  const m=a.length, n=b.length;
+  const dp = Array.from({length:m+1}, ()=>new Array(n+1).fill(0));
+  for (let i=0;i<=m;i++) dp[i][0]=i;
+  for (let j=0;j<=n;j++) dp[0][j]=j;
+  for (let i=1;i<=m;i++){
+    for (let j=1;j<=n;j++){
+      dp[i][j] = a[i-1]===b[j-1] ? dp[i-1][j-1] : 1+Math.min(dp[i-1][j-1], dp[i-1][j], dp[i][j-1]);
+    }
+  }
+  return dp[m][n];
+}
+function bestMatch(input, candidates){
+  let best=null, bestDist=Infinity;
+  const lin = input.toLowerCase();
+  candidates.forEach(c=>{
+    const d = levenshtein(lin, c.toLowerCase());
+    if (d<bestDist){ bestDist=d; best=c; }
+  });
+  return {match:best, dist:bestDist};
+}
+
+function populateOwnerSelect(){
+  const sel = document.getElementById('customOwner');
+  sel.innerHTML = OWNERS.map(o=>`<option value="${o}">${o}</option>`).join('');
+  sel.value = "CSM";
+}
+
+// ---------- rendering ----------
+function render(){
+  renderProductBar(); renderTabs();
+  if (currentTab==='sim') renderSim(); else renderDash();
+}
+function renderProductBar(){
+  document.querySelectorAll('.pbtn').forEach(b=>{ b.dataset.active = (b.dataset.product===currentProduct) ? 'true':'false'; });
+}
+function renderTabs(){
+  document.querySelectorAll('.tabbtn').forEach(b=>{ b.dataset.active = (b.dataset.tab===currentTab) ? 'true':'false'; });
+  document.getElementById('tab-sim').style.display = currentTab==='sim' ? 'block':'none';
+  document.getElementById('tab-dash').style.display = currentTab==='dash' ? 'block':'none';
+}
+
+function renderSim(){
+  const pathRow = document.getElementById('pathRow');
+  pathRow.innerHTML = '';
+  path.forEach((p)=>{
+    const chip = document.createElement('div');
+    chip.className='chip';
+    chip.innerHTML = `<span class="dot ${p.status}"></span><span>${escapeHtml(p.name)}</span>`;
+    pathRow.appendChild(chip);
+  });
+
+  const currentArea = document.getElementById('currentArea');
+  const suggestArea = document.getElementById('suggestArea');
+  const hint = document.getElementById('hintText');
+
+  if (path.length===0){
+    currentArea.innerHTML = '';
+    hint.textContent = 'No step selected yet. Choose the first step of the process below.';
+    renderSuggestions('START', suggestArea);
+    return;
+  }
+
+  const last = path[path.length-1];
+
+  if (last.status === 'open'){
+    currentArea.innerHTML = `
+      <div class="current-box">
+        <div class="row1">
+          <div>
+            <div class="name">${escapeHtml(last.name)}<span class="tag">${isBackbone(last.name)?'backbone step':'optional step'} · open</span></div>
+            <div class="cdesc">${escapeHtml(descOf(last.name))}</div>
+            <div class="cowner">Owner: <b>${escapeHtml(ownerOf(last.name))}</b></div>
+          </div>
+          <div class="close-actions">
+            <button class="closebtn ok" id="closeOk">✓ Close as successful</button>
+            <button class="closebtn bad" id="closeBad">✕ Close as unsuccessful</button>
+          </div>
+        </div>
+        <div class="finalrow">
+          <input type="checkbox" id="finalCheck">
+          <label for="finalCheck">This is the last step of this CTA — log it into the dataset</label>
+        </div>
+      </div>`;
+    document.getElementById('closeOk').onclick = ()=>closeCurrent('success');
+    document.getElementById('closeBad').onclick = ()=>closeCurrent('fail');
+  } else {
+    currentArea.innerHTML = `
+      <div class="current-box">
+        <div class="row1">
+          <div class="name">${escapeHtml(last.name)}<span class="tag">closed · ${last.status}</span></div>
+        </div>
+      </div>`;
+  }
+
+  if (last.name==='Move to BAU'){
+    hint.textContent = 'The process has reached BAU. Reset to try again.';
+    suggestArea.innerHTML = '';
+  } else {
+    hint.textContent = 'Recommended next steps, based on historical transitions:';
+    renderSuggestions(last.name, suggestArea);
+  }
+}
+
+function closeCurrent(status){
+  path[path.length-1].status = status;
+  path[path.length-1].days = daysFor(path[path.length-1].name);
+  const finalCheck = document.getElementById('finalCheck');
+  if (finalCheck && finalCheck.checked){ finalizeJourney(); }
+  else { renderSim(); }
+}
+
+function finalizeJourney(){
+  const journey = path.map(p=>({name:p.name, status:p.status, days:p.days}));
+  DATA[currentProduct].push(journey);
+  STATS[currentProduct] = computeStats(DATA[currentProduct]);
+  journeyCounter++;
+  recordedJourneys.unshift({id:journeyCounter, product:currentProduct, steps:journey});
+  path = [];
+  sessionCounts[currentProduct] = {};
+  clearCustomInputs();
+  render();
+}
+
+function renderSuggestions(fromName, container){
+  const suggestions = getSuggestions(fromName);
+  if (suggestions.length===0){
+    container.innerHTML = '<p class="hint">No common next step in the historical data from this point — add a new one below.</p>';
+    return;
+  }
+  const list = document.createElement('div');
+  list.className='suggestlist';
+  suggestions.forEach(s=>{
+    const row = document.createElement('button');
+    row.className='suggest';
+    const sr = s.successRate;
+    row.innerHTML = `
+      <div class="left">
+        <div class="badgerow">
+          <span class="badge ${s.core?'core':'flex'}">${s.core?'Core':'Flex'}</span>
+          <span class="badge owner">${escapeHtml(s.owner)}</span>
+        </div>
+        <div class="sbody">
+          <div class="sname">${escapeHtml(s.name)}</div>
+          <div class="sdesc">${escapeHtml(descOf(s.name))}</div>
+          <div class="sstat"><b>${s.pct}%</b> of CSMs used this step next</div>
+        </div>
+      </div>
+      <div class="right">
+        <div class="metric">historical success<b class="${sr!==null && sr<75 ? 'warn':''}">${sr===null?'—':'%'+sr}</b></div>
+      </div>`;
+    row.onclick = ()=> advanceTo(s.name);
+    list.appendChild(row);
+  });
+  container.innerHTML='';
+  container.appendChild(list);
+}
+
+// Advances the walk to `name`, closing the current open step as successful first if needed.
+function advanceTo(name, desc, owner){
+  const fromName = path.length ? path[path.length-1].name : 'START';
+  if (path.length && path[path.length-1].status==='open'){
+    path[path.length-1].status='success';
+    path[path.length-1].days=daysFor(path[path.length-1].name);
+  }
+  bumpSession(fromName, name);
+  path.push({name, status:'open'});
+  if (desc){ CUSTOM_DESCS[currentProduct][name] = desc; }
+  if (owner){ CUSTOM_OWNERS[currentProduct][name] = owner; }
+  renderSim();
+}
+
+function escapeHtml(s){
+  return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function clearCustomInputs(){
+  document.getElementById('customInput').value='';
+  document.getElementById('customDesc').value='';
+  updateDescCounter();
+  document.getElementById('customOwner').value='CSM';
+  document.getElementById('customAutocomplete').style.display='none';
+  document.getElementById('customAutocomplete').innerHTML='';
+  hideDidYouMean();
+}
+function updateDescCounter(){
+  document.getElementById('descCount').textContent = document.getElementById('customDesc').value.length;
+}
+function hideDidYouMean(){
+  const dym = document.getElementById('didYouMean');
+  dym.style.display='none'; dym.innerHTML='';
+}
+function showDidYouMean(match, typed){
+  const dym = document.getElementById('didYouMean');
+  dym.style.display='block';
+  dym.innerHTML = `<div class="dymbox">Did you mean <b>${escapeHtml(match)}</b>?
+    <button type="button" id="useMatchBtn">Use "${escapeHtml(match)}"</button>
+    <button type="button" id="addAnywayBtn">Add "${escapeHtml(typed)}" anyway</button></div>`;
+  document.getElementById('useMatchBtn').onclick = ()=>{ selectKnownStep(match); };
+  document.getElementById('addAnywayBtn').onclick = ()=>{ hideDidYouMean(); addCustomStepFinal(typed); };
+}
+function selectKnownStep(name){
+  advanceTo(name);
+  clearCustomInputs();
+}
+function addCustomStepFinal(name){
+  const desc = document.getElementById('customDesc').value.trim().slice(0,250);
+  const owner = document.getElementById('customOwner').value || 'CSM';
+  advanceTo(name, desc, owner);
+  clearCustomInputs();
+}
+
+document.getElementById('customInput').addEventListener('input', ()=>{
+  hideDidYouMean();
+  const box = document.getElementById('customAutocomplete');
+  const val = document.getElementById('customInput').value.trim().toLowerCase();
+  if (val.length<2){ box.style.display='none'; box.innerHTML=''; return; }
+  const known = knownStepsForProduct(currentProduct);
+  const matches = known.filter(k=>k.toLowerCase().includes(val)).slice(0,5);
+  if (matches.length===0){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='flex';
+  box.innerHTML = matches.map((m,i)=>`<button type="button" class="acitem" data-idx="${i}">${escapeHtml(m)}</button>`).join('');
+  Array.from(box.querySelectorAll('.acitem')).forEach((btn,i)=>{
+    btn.onclick = ()=> selectKnownStep(matches[i]);
+  });
+});
+
+document.getElementById('customDesc').addEventListener('input', updateDescCounter);
+
+document.getElementById('customBtn').addEventListener('click', ()=>{
+  const input = document.getElementById('customInput');
+  const val = input.value.trim();
+  if (!val) return;
+  const known = knownStepsForProduct(currentProduct);
+  const exact = known.find(k=>k.toLowerCase()===val.toLowerCase());
+  if (exact){ selectKnownStep(exact); return; }
+  const {match, dist} = bestMatch(val, known);
+  const threshold = match ? Math.max(2, Math.floor(match.length*0.25)) : 0;
+  if (match && dist>0 && dist<=threshold && val.length>=3){
+    showDidYouMean(match, val);
+    return;
+  }
+  addCustomStepFinal(val);
+});
+
+document.getElementById('resetBtn').addEventListener('click', ()=>{
+  path = []; sessionCounts[currentProduct] = {};
+  clearCustomInputs();
+  renderSim();
+});
+
+document.querySelectorAll('.pbtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    currentProduct = btn.dataset.product;
+    path = [];
+    clearCustomInputs();
+    render();
+  });
+});
+document.querySelectorAll('.tabbtn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{ currentTab = btn.dataset.tab; render(); });
+});
+
+// ---------- Dashboard ----------
+let usageChartInst=null, successChartInst=null;
+
+function renderDash(){
+  const stats = STATS[currentProduct];
+  const names = Object.keys(stats.usage).sort((a,b)=>stats.usage[b]-stats.usage[a]);
+
+  const healthBody = document.getElementById('healthBody');
+  healthBody.innerHTML = names.map(name=>{
+    const h = stats.health[name];
+    const usagePct = Math.round((stats.usage[name]/stats.total)*100);
+    const closed = h.success+h.fail;
+    const successPct = closed>0 ? Math.round((h.success/closed)*100) : null;
+    const avgDays = Math.round(h.days/h.n);
+    const pillClass = successPct===null ? 'mid' : (successPct>=85?'good':(successPct>=70?'mid':'bad'));
+    return `<tr>
+      <td class="stepcell"><div class="sname">${escapeHtml(name)}</div><div class="sdesc">${escapeHtml(descOf(name))}</div></td>
+      <td>${isBackbone(name)?'Backbone':'Optional'}</td>
+      <td><span class="ownertag">${escapeHtml(ownerOf(name))}</span></td>
+      <td class="num">${usagePct}%</td>
+      <td><span class="pill ${pillClass}">${successPct===null?'—':successPct+'%'}</span></td>
+      <td class="num">${avgDays}d</td>
+      <td class="num">${h.n}</td>
+    </tr>`;
+  }).join('');
+
+  // Ownership load
+  const ownerAgg = {};
+  names.forEach(name=>{
+    const owner = ownerOf(name);
+    const h = stats.health[name];
+    if (!ownerAgg[owner]) ownerAgg[owner] = {success:0, fail:0, days:0, n:0};
+    const o = ownerAgg[owner];
+    o.success += h.success; o.fail += h.fail; o.days += h.days; o.n += h.n;
+  });
+  const ownerRows = Object.entries(ownerAgg).map(([owner,o])=>{
+    const closed = o.success+o.fail;
+    const successPct = closed>0 ? Math.round((o.success/closed)*100) : null;
+    const avgDays = o.n>0 ? Math.round(o.days/o.n) : 0;
+    return {owner, n:o.n, successPct, avgDays};
+  }).sort((a,b)=>{
+    const av = a.successPct===null?100:a.successPct, bv = b.successPct===null?100:b.successPct;
+    return av-bv;
+  });
+  const ownerBody = document.getElementById('ownerBody');
+  ownerBody.innerHTML = ownerRows.map(r=>{
+    const pillClass = r.successPct===null ? 'mid' : (r.successPct>=85?'good':(r.successPct>=70?'mid':'bad'));
+    return `<tr>
+      <td>${escapeHtml(r.owner)}</td>
+      <td class="num">${r.n}</td>
+      <td><span class="pill ${pillClass}">${r.successPct===null?'—':r.successPct+'%'}</span></td>
+      <td class="num">${r.avgDays}d</td>
+    </tr>`;
+  }).join('');
+
+  const bottlenecks = names.filter(name=>{
+    const h = stats.health[name];
+    const closed = h.success+h.fail;
+    const successPct = closed>0 ? (h.success/closed)*100 : 100;
+    const usagePct = (stats.usage[name]/stats.total)*100;
+    return successPct < 75 && usagePct > 12;
+  });
+  const bnArea = document.getElementById('bottleneckArea');
+  if (bottlenecks.length===0){
+    bnArea.innerHTML = '<p class="nowarn">No clear bottleneck detected for this product.</p>';
+  } else {
+    bnArea.innerHTML = bottlenecks.map(name=>{
+      const h = stats.health[name];
+      const closed = h.success+h.fail;
+      const successPct = Math.round((h.success/closed)*100);
+      const usagePct = Math.round((stats.usage[name]/stats.total)*100);
+      return `<div class="warncard"><b>${escapeHtml(name)}</b> — used in ${usagePct}% of CTAs, owned by <b>${escapeHtml(ownerOf(name))}</b>, but only ${successPct}% close successfully.</div>`;
+    }).join('');
+  }
+
+  // Standardization candidates: optional steps with high, consistent usage, not yet backbone/promoted, not dismissed
+  const candArea = document.getElementById('candidateArea');
+  const candidates = names.filter(name=>{
+    if (isBackbone(name)) return false;
+    if (dismissedCandidates[currentProduct].has(name)) return false;
+    const usagePct = (stats.usage[name]/stats.total)*100;
+    return usagePct >= 80;
+  });
+  if (candidates.length===0){
+    candArea.innerHTML = '<p class="nowarn">No optional step has crossed the standardization threshold (80% usage) for this product yet.</p>';
+  } else {
+    candArea.innerHTML = '';
+    candidates.forEach(name=>{
+      const usagePct = Math.round((stats.usage[name]/stats.total)*100);
+      const card = document.createElement('div');
+      card.className='candcard';
+      card.innerHTML = `
+        <div class="ctop">
+          <div>
+            <div class="cname">${escapeHtml(name)}</div>
+            <div class="cmeta">Used in ${usagePct}% of ${escapeHtml(PRODUCTS[currentProduct].label)} CTAs · owned by ${escapeHtml(ownerOf(name))} · currently optional</div>
+          </div>
+          <div class="candactions">
+            <button class="candbtn promote" type="button">Promote to Backbone</button>
+            <button class="candbtn dismiss" type="button">Not Yet</button>
+          </div>
+        </div>`;
+      card.querySelector('.promote').onclick = ()=>{
+        promotedBackbone[currentProduct].add(name);
+        renderDash();
+      };
+      card.querySelector('.dismiss').onclick = ()=>{
+        dismissedCandidates[currentProduct].add(name);
+        renderDash();
+      };
+      candArea.appendChild(card);
+    });
+  }
+
+  const transBody = document.getElementById('transBody');
+  const rows = [];
+  Object.keys(stats.transitions).forEach(from=>{
+    if (from==='START') return;
+    const tos = stats.transitions[from];
+    const sum = Object.values(tos).reduce((a,b)=>a+b,0);
+    const topTo = Object.entries(tos).sort((a,b)=>b[1]-a[1])[0];
+    if (topTo) rows.push({from, to:topTo[0], pct:Math.round((topTo[1]/sum)*100)});
+  });
+  rows.sort((a,b)=> BACKBONE.indexOf(a.from) - BACKBONE.indexOf(b.from));
+  transBody.innerHTML = rows.map(r=>`<tr><td>${escapeHtml(r.from)}</td><td>${escapeHtml(r.to)}</td><td class="num">${r.pct}%</td></tr>`).join('');
+
+  const recArea = document.getElementById('recordedArea');
+  const productRecords = recordedJourneys.filter(r=>r.product===currentProduct);
+  if (productRecords.length===0){
+    recArea.innerHTML = '<p class="nowarn">No CTAs logged yet for this product.</p>';
+  } else {
+    recArea.innerHTML = productRecords.map(r=>{
+      const chain = r.steps.map(s=>escapeHtml(s.name)).join(' → ');
+      return `<div class="recrow"><div class="rchain">${chain}</div><div class="rmeta">${r.steps.length} steps · logged by Cenk for ${escapeHtml(PRODUCTS[r.product].label)} · now included in the stats above</div></div>`;
+    }).join('');
+  }
+
+  renderHeatmap();
+  drawCharts(names, stats);
+}
+
+function renderHeatmap(){
+  const area = document.getElementById('heatmapArea');
+  const order = [];
+  const seen = new Set();
+  BACKBONE.forEach(n=>{ if(!seen.has(n)){ order.push(n); seen.add(n); } });
+  ['A','B','C'].forEach(p=>{
+    PRODUCTS[p].optionals.forEach(o=>{ if(!seen.has(o.name)){ order.push(o.name); seen.add(o.name); } });
+  });
+  recordedJourneys.forEach(r=>{ r.steps.forEach(s=>{ if(!seen.has(s.name)){ order.push(s.name); seen.add(s.name); } }); });
+
+  function heatColor(pct){
+    if (pct>=90) return {bg:'#1F6F63', fg:'#FFFFFF'};
+    if (pct>=70) return {bg:'#7FB8AE', fg:'#16221F'};
+    if (pct>=40) return {bg:'#F6EAD3', fg:'#16221F'};
+    if (pct>0) return {bg:'var(--chip)', fg:'var(--ink-soft)'};
+    return {bg:'transparent', fg:'var(--ink-soft)'};
+  }
+
+  let html = '<div class="heatgrid">';
+  html += '<div></div><div class="heathead">Product A</div><div class="heathead">Product B</div><div class="heathead">Product C</div>';
+  order.forEach(name=>{
+    html += `<div class="heatlabel">${escapeHtml(name)}</div>`;
+    ['A','B','C'].forEach(p=>{
+      const st = STATS[p];
+      const pct = st.usage[name] ? Math.round((st.usage[name]/st.total)*100) : 0;
+      const c = heatColor(pct);
+      const border = pct===0 ? 'border:1px dashed var(--line);' : '';
+      html += `<div class="heatcell" style="background:${c.bg}; color:${c.fg}; ${border}">${pct}%</div>`;
+    });
+  });
+  html += '</div>';
+  area.innerHTML = html;
+}
+
+function drawCharts(names, stats){
+  const top = names.slice(0,9);
+  const usageVals = top.map(n=>Math.round((stats.usage[n]/stats.total)*100));
+  const successVals = top.map(n=>{
+    const h = stats.health[n]; const closed=h.success+h.fail;
+    return closed>0 ? Math.round((h.success/closed)*100) : 0;
+  });
+  const colors = top.map(n=> isBackbone(n) ? '#20726A' : '#B9791F');
+  const shortLabels = top.map(n=> n.length>18 ? n.slice(0,16)+'…' : n);
+
+  const ctx1 = document.getElementById('usageChart').getContext('2d');
+  const ctx2 = document.getElementById('successChart').getContext('2d');
+  if (usageChartInst) usageChartInst.destroy();
+  if (successChartInst) successChartInst.destroy();
+
+  const baseOpts = {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{display:false}},
+    scales:{
+      x:{ticks:{color:getVar('--ink-soft'),font:{size:10}}, grid:{display:false}},
+      y:{beginAtZero:true, max:100, ticks:{color:getVar('--ink-soft'),font:{size:10}}, grid:{color:getVar('--line')}}
+    }
+  };
+
+  usageChartInst = new Chart(ctx1, {
+    type:'bar',
+    data:{labels:shortLabels, datasets:[{label:'Usage %', data:usageVals, backgroundColor:colors, borderRadius:4}]},
+    options:{...baseOpts, plugins:{legend:{display:false}, title:{display:true, text:'Usage %', color:getVar('--ink'), font:{size:11.5, family:'Sora'}}}}
+  });
+  successChartInst = new Chart(ctx2, {
+    type:'bar',
+    data:{labels:shortLabels, datasets:[{label:'Success %', data:successVals, backgroundColor:'#4A90A4', borderRadius:4}]},
+    options:{...baseOpts, plugins:{legend:{display:false}, title:{display:true, text:'Success Rate %', color:getVar('--ink'), font:{size:11.5, family:'Sora'}}}}
+  });
+}
+function getVar(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim() || '#888'; }
+
+populateOwnerSelect();
+updateDescCounter();
+render();
+})();
+</script>
+</body>
+</html>
